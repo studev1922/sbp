@@ -1,0 +1,19 @@
+{
+  "name": "sbp",
+  "version": "1.0.0",
+  "description": "s-base project",
+  "type": "module",
+  "author": "StuDev",
+  "license": "ISC",
+  "main": "main",
+  "scripts": {
+    "start": "node ./src/main",
+    "dev": "nodemon ./src/main.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.1"
+  }
+}
