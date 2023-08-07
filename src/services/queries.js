@@ -11,7 +11,7 @@ const modify = (data) => {
         case 'object':
             if (data instanceof Date) {
                 data = data.toISOString().replace('T', ' ');
-                return `'${data.substring(0, data.length-1)}'`;
+                return `'${data.substring(0, data.length - 1)}'`;
             }
             data = Object.assign({}, data); // to avoid overwriting
             if (data.type) return data.type.replace('?', data.value);
@@ -21,27 +21,37 @@ const modify = (data) => {
     }
 }
 
-const single = {
-    /**
-     * 
-     * @param {String} table 
-     * @param {Number} top integer
-     * @param {String || Array} fields 
-     * @returns 
-     */
-    select: (table, top, fields) => `SELECT${top ? ` TOP ${top} ` : ' '}${fields || '*'} FROM ${table}`,
-}
-
 const queries = {
 
-    select: function (table, top, fields, ...serials) {
-        let query = single.select(table, top, fields);
+    select: (table, top, fields, ...serials) => {
+        let query = `SELECT${top ? ` TOP ${top} ` : ' '}${fields || '*'} FROM ${table}`;
         return serials?.length ? `${query} ${serials.join('\xa0')}` : query
     },
-    insert: function (table, data) {
+    insert: (table, data) => `INSERT INTO ${table} (${Object.keys(data)}) values(${Object.values(data)});`,
+    update: (table, data, ...serials) => {
         let keys = Object.keys(data);
-        let values = Object.values(data);
-        return `INSERT INTO ${table} (${keys}) values(${values});`;
+        let query = `UPDATE ${table} SET `;
+
+        for (let k of keys) query += `${k}=${data[k]},`;
+        return serials?.length
+            ? `${query.substring(0, query.length - 1)} ${serials.join('\xa0')}`
+            : query.substring(0, query.length - 1);
+    },
+    delete: (table, data, isAbsolute) => {
+
+        let query = `DELETE FROM ${table} WHERE `;
+        let serials = isAbsolute ? ' AND ' : ' OR ';
+        let value, keys = Object.keys(data);
+
+        // serials conditional
+        for (let k of keys) {
+            value = data[k]; // is array "key" in (value) || key euqual value
+            query += Array.isArray(value) 
+                ? `${k} IN (${value})${serials}` 
+                : `${k}=${value}${serials}`;
+        }
+
+        return query.substring(0, query.length - serials.length);
     }
 
 };
@@ -68,5 +78,19 @@ export default {
      * @param {Object} data object model to insert
      * @returns query insert data
      */
-    insert: queries.insert
+    insert: queries.insert,
+
+    /**
+     * @param {String} table to update data
+     * @param {Object} data to update
+     * @returns 
+     */
+    update: queries.update,
+
+    /**
+     * @param {String} table to delete data
+     * @param {Object} data for delete
+     * @param {Boolean} isAbsolute ? AND : OR
+     */
+    delete: queries.delete
 };
