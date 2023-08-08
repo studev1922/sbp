@@ -26,38 +26,43 @@ const queries = {
         let query = `SELECT${top ? ` TOP ${top} ` : ' '}${fields || '*'} FROM ${table}`;
         return serials?.length ? `${query} ${serials.join('\xa0')}` : query
     },
-    insert: (table, data) => {
+    insert: (table, data, isOutput) => {
+        let output = 'OUTPUT inserted.*';
+
         if (Array.isArray(data)) {
             let keys = Object.keys(data[0]);
-            let query = `INSERT INTO ${table} (${keys}) VALUES\n`;
+            let query = `INSERT INTO ${table} (${keys}) ${isOutput ? output : ''} VALUES\n`;
 
             for (let obj of data) query += ` (${Object.values(modify(obj))}),\n`
             return query.substring(0, query.length - 2);
         } else {
             data = modify(data);
-            return `INSERT INTO ${table} (${Object.keys(data)}) values(${Object.values(data)});`
+            return `INSERT INTO ${table} (${Object.keys(data)}) ${isOutput ? output : ''} VALUES(${Object.values(data)});`
         }
     },
-    update: (table, data, ...by) => {
-        let keys, query;
+    update: (table, data, isOutput, ...by) => {
+        if(!by?.length) throw new Error('The "unique" parameter needs at least one unique column name')
+        let keys, query, output = 'OUTPUT inserted.*';
 
         if (Array.isArray(data)) {
             keys = Object.keys(data[0]);
 
             // set keys inner join t1 = t2
             query = `UPDATE t1 SET `
-            for (let k of keys) query += `t1.${k}=t2.${k},\n`;
+            for (let k of keys) query += ` t1.${k}=t2.${k},\n`;
             query = query.substring(0, query.length - 2) // sub ',\n'
-            
+
+            if (isOutput) query += `\n${output}\n`
+
             // set join data values (...)
             query += `\nFROM ${table} t1 INNER JOIN (\nVALUES\n`
-            for (let obj of data) query += `(${Object.values(modify(obj))}),\n`;
+            for (let obj of data) query += ` (${Object.values(modify(obj))}),\n`;
             query = query.substring(0, query.length - 2) // sub ,\n
-            
+
             // set key for t2 as columns EX: (id,name,note...)
             query += `\n) t2 (${keys})\n ON `;
             for (let k of by) query += `t1.${k}=t2.${k} OR `;
-            return query.substring(0, query.length-4); // sub ' OR '
+            return query.substring(0, query.length - 4); // sub ' OR '
         } else {
             data = modify(data);
             keys = Object.keys(data);
@@ -69,11 +74,12 @@ const queries = {
 
             let values = {};
             for (let k of by) values[k] = data[k];
-            return `${query} WHERE ${queries.conditions(values, true)}`;
+            return `${query} ${isOutput ? output : ''} WHERE ${queries.conditions(values, true)}`;
         }
     },
-    delete: (table, data, isAbsolute) => {
-        return `DELETE FROM ${table} WHERE ${queries.conditions(modify(data), isAbsolute)}`;
+    delete: (table, data, isOutput, isAbsolute) => {
+        let output = ' OUTPUT deleted.*';
+        return `DELETE FROM ${table}${isOutput ? output : ''} WHERE ${queries.conditions(modify(data), isAbsolute)}`;
     },
     conditions: (data, isAbsolute) => {
         let conditions = new String();
@@ -107,6 +113,7 @@ export default {
     /**
      * @param {String} table to insert data
      * @param {Object || Array<Object>} data object model to insert
+     * @param {Boolean} isOutput get output data after execute
      * @returns query insert data
      */
     insert: queries.insert,
@@ -114,6 +121,7 @@ export default {
     /**
      * @param {String} table to update data
      * @param {Object || Array<Object>} data to update
+     * @param {Boolean} isOutput get output data after execute
      * @param {...String} by fields to update
      * @returns 
      */
@@ -122,6 +130,7 @@ export default {
     /**
      * @param {String} table to delete data
      * @param {Object} data for delete
+     * @param {Boolean} isOutput get output data after execute
      * @param {Boolean} isAbsolute ? AND : OR
      */
     delete: queries.delete,
