@@ -23,7 +23,7 @@ const modify = (data) => {
 
 const queries = {
     select: (table, top, fields, ...serials) => {
-        let query = `SELECT${top ? ` TOP ${top} ` : ' '}${fields || '*'} FROM ${table}`;
+        let query = `SELECT${top > 0 ? ` TOP ${top} ` : ' '}${fields || '*'} FROM ${table}`;
         return serials?.length ? `${query} ${serials.join('\xa0')}` : query
     },
     insert: (table, data, isOutput) => {
@@ -41,7 +41,7 @@ const queries = {
         }
     },
     update: (table, data, isOutput, ...by) => {
-        if(!by?.length) throw new Error('The "unique" parameter needs at least one unique column name')
+        if (!by?.length) throw new Error('The "unique" parameter needs at least one unique column name')
         let keys, query, output = 'OUTPUT inserted.*';
 
         if (Array.isArray(data)) {
@@ -55,14 +55,14 @@ const queries = {
             if (isOutput) query += `\n${output}\n`
 
             // set join data values (...)
-            query += `\nFROM ${table} t1 INNER JOIN (\nVALUES\n`
+            query += `FROM ${table} t1 INNER JOIN (\nVALUES\n`
             for (let obj of data) query += ` (${Object.values(modify(obj))}),\n`;
             query = query.substring(0, query.length - 2) // sub ,\n
 
             // set key for t2 as columns EX: (id,name,note...)
             query += `\n) t2 (${keys})\n ON `;
-            for (let k of by) query += `t1.${k}=t2.${k} OR `;
-            return query.substring(0, query.length - 4); // sub ' OR '
+            for (let k of by) query += `t1.${k}=t2.${k} AND `;
+            return query.substring(0, query.length - 5); // sub ' AND '
         } else {
             data = modify(data);
             keys = Object.keys(data);
