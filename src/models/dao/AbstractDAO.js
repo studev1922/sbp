@@ -18,16 +18,26 @@ export default class AbstractDAO {
         let uniques = Object.keys(_unique);
         async function execute(array) {
             let query = queries[call](_table, array, true, ...uniques);
-            return sql.execute(query).catch(console.error).then(r => r.recordset);
+            return sql.execute(query).then(r => r.recordset)
+                .catch(e => {
+                    console.error(e);
+                    throw new Error(e.message);
+                });
         }
 
         if (isArray) { // execute the fisrt 1000 rows when size of array lager than 1 thousand
-            var response = [];
+            var success = [], failue = [];
+
             for (let i = 0; i < data.length;) {
                 await execute(data.slice(i, i += 1e3))
-                    .then(record => response.push(...record));
+                    .then(record => success.push(...record))
+                    .catch(failue.push);
             }
-            return response;
+            
+            return new Promise((resolve, reject) => {
+                if (success.length) resolve(success);
+                if (failue.length) reject(failue);
+            });
         } else return execute(data); // single
     };
 
@@ -62,8 +72,7 @@ export default class AbstractDAO {
 
     async select(top, fields) {
         let query = queries.select(this._table, top, fields);
-        return sql.execute(query).catch(console.error)
-            .then(res => res.recordset);
+        return sql.execute(query).then(res => res.recordset);
     }
 
     async insert(data) {
